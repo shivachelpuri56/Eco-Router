@@ -1,0 +1,2120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eco-Router — Carbon-Aware Intelligent Load Balancer</title>
+    <meta name="description" content="Eco-Router is a carbon-aware intelligent load balancer that routes workloads to the lowest-carbon available region in real time.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/three@0.145.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/globe.gl@2.26.0/dist/globe.gl.min.js"></script>
+    <style>
+        :root {
+            /* Warm ivory palette */
+            --bg: #F7F4EC;
+            --surface: #FDFAF5;
+            --surface2: #F0EDE3;
+            --text-primary: #1C1A14;
+            --text-secondary: #6B6860;
+            --forest: #1B4332;
+            --forest-light: #2D6A4F;
+            --sage: #52796F;
+            --earth: #7C5C3A;
+            --gold: #A08040;
+            --border: #DDD8C8;
+            --danger: #8B2020;
+            --warning: #B07020;
+            
+            /* Status semantic colors */
+            --status-low: var(--forest);
+            --status-med: var(--warning);
+            --status-high: var(--danger);
+
+            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-primary);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0; width: 100%;
+            background: rgba(253, 250, 245, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .brand-subtitle {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+        
+        .nav-links a:hover { color: var(--forest); }
+        
+        .btn-outline {
+            border: 1px solid var(--forest);
+            padding: 0.5rem 1.25rem;
+            border-radius: 6px;
+            color: var(--forest);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-outline:hover {
+            background: var(--forest);
+            color: white;
+        }
+        
+        .sys-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            background: var(--surface2);
+            border-radius: 100px;
+        }
+        
+        .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--forest);
+            box-shadow: 0 0 8px var(--forest);
+        }
+
+        /* Layout */
+        main {
+            padding-top: 80px;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding-bottom: 4rem;
+        }
+        
+        section { margin-bottom: 4rem; padding: 0 2rem; }
+        
+        h2 { font-size: 2rem; margin-bottom: 1.5rem; color: var(--text-primary); }
+        
+        /* Hero */
+        .hero {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            min-height: 80vh;
+            align-items: center;
+        }
+
+        .hero-text h1 {
+            font-size: 4rem;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.02em;
+        }
+        
+        .hero-text p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            max-width: 480px;
+            line-height: 1.6;
+        }
+
+        .btn-primary {
+            background: var(--forest);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        
+        .btn-primary:hover {
+            background: var(--forest-light);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(27, 67, 50, 0.2);
+        }
+        
+        .btn-primary:disabled {
+            background: var(--text-secondary);
+            transform: none;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .globe-container {
+            width: 100%;
+            height: 600px;
+            background: var(--surface);
+            border-radius: 24px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+        }
+        
+        /* Region markers */
+        .marker {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+            color: var(--text-primary);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .marker.selected {
+            border-color: var(--forest);
+            box-shadow: 0 0 0 2px var(--forest);
+            transform: scale(1.1);
+            z-index: 10;
+        }
+        
+        .marker .val { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
+
+        /* Region Cards */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+            transition: all 0.3s;
+        }
+        
+        .card.selected {
+            border: 2px solid var(--forest);
+            box-shadow: 0 8px 24px rgba(27, 67, 50, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card.selected::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 4px;
+            background: var(--forest);
+        }
+
+        .card h3 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+        .card .location { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1.5rem; }
+        
+        .intensity-val {
+            font-size: 3rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+        
+        .intensity-unit { color: var(--text-secondary); font-size: 0.875rem; font-weight: 600; }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 1.5rem;
+        }
+
+        /* Semantic colors for cards/badges */
+        .low { color: var(--status-low); }
+        .med { color: var(--status-med); }
+        .high { color: var(--status-high); }
+        .bg-low { background: rgba(27, 67, 50, 0.1); color: var(--status-low); }
+        .bg-med { background: rgba(176, 112, 32, 0.1); color: var(--status-med); }
+        .bg-high { background: rgba(139, 32, 32, 0.1); color: var(--status-high); }
+
+        /* Decision Panel & AI Insight */
+        .split-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        
+        .terminal {
+            background: #111;
+            color: #f0f0f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            height: 400px;
+            overflow-y: auto;
+            box-shadow: inset 0 2px 12px rgba(0,0,0,0.5);
+        }
+        
+        .term-header {
+            display: flex; gap: 0.5rem; margin-bottom: 1.5rem;
+        }
+        
+        .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .td-r { background: #ff5f56; } .td-y { background: #ffbd2e; } .td-g { background: #27c93f; }
+        
+        .log-line { margin-bottom: 0.5rem; line-height: 1.4; opacity: 0; animation: fadeIn 0.1s forwards; }
+        .log-prefix { color: #a08040; font-weight: bold; }
+        .log-success { color: #27c93f; }
+        
+        .ai-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .ai-panel h3 { font-size: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
+        .ai-badge { background: var(--surface2); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; color: var(--earth); }
+        .ai-text { font-size: 1.125rem; line-height: 1.6; color: var(--text-primary); margin: 1.5rem 0; font-weight: 500;}
+        .ai-disclaimer { font-size: 0.75rem; color: var(--text-secondary); border-top: 1px solid var(--border); padding-top: 1rem;}
+
+        /* Eco Intelligence Section */
+        .eco-intel-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 3rem;
+        }
+        .eco-intel-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .eco-intel-title { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .eco-intel-subtitle { color: var(--text-secondary); font-size: 0.95rem; }
+        .eco-intel-disclaimer {
+            background: var(--surface2);
+            border-left: 3px solid var(--forest);
+            padding: 0.75rem 1rem;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+        .eco-intel-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        .ei-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.75rem;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .ei-card.visible { opacity: 1; transform: none; }
+        .ei-card-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+        .ei-card-body { font-size: 0.95rem; line-height: 1.65; color: var(--text-primary); min-height: 60px; }
+        .ei-card-obs { margin-top: 1rem; }
+        .ei-card-obs ul { margin: 0; padding-left: 1rem; }
+        .ei-card-obs li { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .ei-card-recs { margin-top: 1rem; }
+        .ei-card-recs li { font-size: 0.85rem; color: var(--forest-light); margin-bottom: 0.4rem; }
+        .eco-intel-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .ai-status-badge {
+            padding: 0.3rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+        }
+        .ai-status-live { background: rgba(27,67,50,0.12); color: var(--forest); }
+        .ai-status-demo { background: rgba(160,128,64,0.12); color: var(--earth); }
+        .ai-analyze-btn {
+            background: var(--forest);
+            color: white;
+            border: none;
+            padding: 0.875rem 2rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.875rem;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: all 0.25s;
+            white-space: nowrap;
+        }
+        .ai-analyze-btn:hover:not(:disabled) { background: var(--forest-light); transform: translateY(-1px); }
+        .ai-analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .eco-intel-loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            display: none;
+        }
+        .eco-intel-loading.active { display: block; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .loading-dot { animation: pulse 1.4s ease-in-out infinite; }
+        @media (max-width: 1024px) { .eco-intel-cards { grid-template-columns: 1fr; } }
+
+        /* Metrics & History */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        .metric-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            border-radius: 12px;
+        }
+        .metric-card h4 { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 600; text-transform: uppercase;}
+        .metric-card .val { font-size: 2rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+        table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--surface2); font-weight: 600; font-size: 0.875rem; color: var(--text-secondary); }
+        td { font-size: 0.95rem; }
+        
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 3rem 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Routing Pipeline Visual */
+        .pipeline {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        .pipe-step { padding: 0.5rem 1rem; background: var(--surface2); border-radius: 100px; transition: all 0.3s; }
+        .pipe-step.active { background: var(--forest); color: white; }
+
+        /* ── Phase J: Voice AI ─────────────────────────────────────────── */
+        .voice-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: 100px;
+            padding: 0.75rem 1.5rem;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.8rem;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: all 0.25s;
+            color: var(--text-primary);
+        }
+        .voice-btn:hover:not(:disabled) { border-color: var(--forest); color: var(--forest); transform: translateY(-1px); }
+        .voice-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .voice-btn.listening { border-color: var(--danger); color: var(--danger); animation: voice-pulse 1s ease-in-out infinite; }
+        .voice-btn.processing { border-color: var(--gold); color: var(--gold); }
+        .mic-icon { font-size: 1.1rem; }
+        @keyframes voice-pulse { 0%,100%{ box-shadow: 0 0 0 0 rgba(139,32,32,0.3); } 50%{ box-shadow: 0 0 0 8px rgba(139,32,32,0); } }
+        .voice-unavailable { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; }
+        .voice-state-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+        .voice-transcript { font-size: 0.9rem; color: var(--forest); font-style: italic; min-height: 1.4em; margin: 0.5rem 0; }
+
+        /* ── Phase K: AI Ask Console ─────────────────────────────────────── */
+        .ai-ask-console {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.5rem;
+        }
+        .ai-ask-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .ai-ask-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .ai-quick-btns { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.5rem; }
+        .ai-quick-btn {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 0.5rem 1rem;
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-primary);
+        }
+        .ai-quick-btn:hover { background: var(--forest); color: white; border-color: var(--forest); }
+        .ai-input-row { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; }
+        .ai-input {
+            flex: 1;
+            background: var(--bg);
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 0.875rem 1rem;
+            font-family: inherit;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            transition: border-color 0.2s;
+        }
+        .ai-input:focus { outline: none; border-color: var(--forest); }
+        .ai-ask-btn {
+            background: var(--forest);
+            color: white;
+            border: none;
+            padding: 0.875rem 1.75rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.25s;
+            white-space: nowrap;
+        }
+        .ai-ask-btn:hover:not(:disabled) { background: var(--forest-light); transform: translateY(-1px); }
+        .ai-ask-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .ai-answer-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 120px;
+            display: none;
+        }
+        .ai-answer-box.visible { display: block; }
+        .ai-answer-meta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; font-size: 0.75rem; color: var(--text-secondary); }
+        .ai-meta-pill { background: var(--surface2); border-radius: 100px; padding: 0.2rem 0.6rem; }
+        .ai-answer-text { font-size: 0.95rem; line-height: 1.7; color: var(--text-primary); }
+        .ai-disclaimer-small { margin-top: 1rem; font-size: 0.75rem; color: var(--text-secondary); border-top: 1px solid var(--border); padding-top: 0.75rem; }
+
+        /* ── Phase K: Forecast Panel ─────────────────────────────────────── */
+        .forecast-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.5rem;
+        }
+        .forecast-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 1.5rem; }
+        .forecast-region-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+        .forecast-region-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .forecast-steps { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+        .forecast-step {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            background: var(--surface2);
+            font-size: 0.85rem;
+        }
+        .forecast-step.current { background: rgba(27,67,50,0.08); border-left: 3px solid var(--forest); }
+        .forecast-step-label { color: var(--text-secondary); font-size: 0.75rem; }
+        .forecast-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+        .forecast-label-bar {
+            background: rgba(160,128,64,0.1);
+            border: 1px solid rgba(160,128,64,0.3);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--gold);
+            text-align: center;
+            margin-bottom: 1rem;
+            letter-spacing: 0.06em;
+        }
+        .forecast-insufficient { color: var(--text-secondary); font-style: italic; padding: 2rem; text-align: center; }
+        @media (max-width: 1024px) { .forecast-grid { grid-template-columns: 1fr; } }
+
+        /* ── Phase K: RAG Knowledge Panel ───────────────────────────────── */
+        .rag-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.5rem;
+        }
+        .rag-prompts { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1rem 0; }
+        .rag-prompt-btn {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            font-family: inherit;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-primary);
+            text-align: left;
+        }
+        .rag-prompt-btn:hover { border-color: var(--forest); color: var(--forest); }
+        .rag-results { margin-top: 1.5rem; }
+        .rag-chunk {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            transition: border-color 0.2s;
+        }
+        .rag-chunk:hover { border-color: var(--sage); }
+        .rag-chunk-header { display: flex; justify-content: space-between; margin-bottom: 0.75rem; }
+        .rag-source-tag { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--sage); }
+        .rag-score-tag { font-size: 0.7rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+        .rag-chunk-text { font-size: 0.9rem; line-height: 1.65; color: var(--text-primary); }
+        .rag-input-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+        .rag-input {
+            flex: 1;
+            background: var(--bg);
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-family: inherit;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+        .rag-input:focus { outline: none; border-color: var(--sage); }
+        .rag-search-btn {
+            background: var(--sage);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .rag-search-btn:hover { background: var(--forest); }
+
+        /* ── Phase K: Responsible AI Section ────────────────────────────── */
+        .responsible-ai-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.5rem;
+        }
+        .rai-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; margin-top: 1.5rem; }
+        .rai-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+        .rai-icon { font-size: 1.5rem; flex-shrink: 0; }
+        .rai-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; color: var(--forest); }
+        .rai-desc { font-size: 0.85rem; line-height: 1.55; color: var(--text-secondary); }
+        @media (max-width: 768px) { .rai-grid { grid-template-columns: 1fr; } }
+
+        /* ── Phase K: Before/After Comparison ───────────────────────────── */
+        .comparison-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.5rem;
+        }
+        .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1.5rem; }
+        .comparison-col {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.75rem;
+        }
+        .comparison-col.eco { border-color: var(--forest); background: rgba(27,67,50,0.03); }
+        .comparison-col-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-secondary); margin-bottom: 1rem; }
+        .comparison-val { font-size: 1.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin: 0.5rem 0; }
+        .comparison-val.eco-val { color: var(--forest); }
+        .comparison-desc { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.55; }
+        .comparison-formula { background: var(--surface2); border-radius: 8px; padding: 1rem; margin-top: 1.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.7; }
+        .est-savings-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); margin-bottom: 0.5rem; }
+        @media (max-width: 768px) { .comparison-grid { grid-template-columns: 1fr; } }
+
+        /* ── Enhanced history table ──────────────────────────────────────── */
+        .history-filters { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .history-filter {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.4rem 0.9rem;
+            font-family: inherit;
+            font-size: 0.8rem;
+            cursor: pointer;
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+        .history-filter.active { background: var(--forest); color: white; border-color: var(--forest); }
+        .badge-success { background: rgba(27,67,50,0.1); color: var(--forest); border-radius: 4px; padding: 0.15rem 0.4rem; font-size: 0.7rem; font-weight: 700; }
+        .badge-error { background: rgba(139,32,32,0.1); color: var(--danger); border-radius: 4px; padding: 0.15rem 0.4rem; font-size: 0.7rem; font-weight: 700; }
+        .savings-cell { font-size: 0.8rem; color: var(--sage); font-family: 'JetBrains Mono', monospace; }
+
+        /* ── Toast notifications ─────────────────────────────────────────── */
+        #toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; }
+        .toast {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.875rem 1.25rem;
+            font-size: 0.85rem;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            animation: toast-in 0.3s ease forwards;
+            max-width: 320px;
+        }
+        .toast.success { border-left: 3px solid var(--forest); }
+        .toast.error { border-left: 3px solid var(--danger); }
+        @keyframes toast-in { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform: none; } }
+        @keyframes toast-out { from { opacity:1; } to { opacity:0; transform: translateY(12px); } }
+
+        @media (max-width: 1024px) {
+            .hero, .split-section { grid-template-columns: 1fr; gap: 2rem; }
+            .cards-grid { grid-template-columns: 1fr; }
+            .metrics-grid { grid-template-columns: 1fr 1fr; }
+            .globe-container { height: 400px; }
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-link" style="position:absolute; left:-9999px; top:-9999px;">Skip to main content</a>
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <header aria-label="Main Navigation">
+        <div class="brand">
+            ECO-ROUTER
+            <span class="brand-subtitle">Carbon-Aware Intelligent Load Balancer</span>
+        </div>
+        <div class="nav-links">
+            <div class="sys-status" title="System Status">
+                <div class="dot"></div> Operational
+            </div>
+            <a href="#how-it-works">Technology</a>
+            <div id="authNav">
+                <!-- Dynamically populated based on auth status -->
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-text">
+                <h1>ROUTE WORKLOADS WHERE ELECTRICITY IS CLEANER.</h1>
+                <p>Eco-Router dynamically routes flexible workloads toward available infrastructure regions with lower grid carbon intensity.</p>
+                
+                <div class="pipeline">
+                    <div class="pipe-step" id="step1">CHECK</div> &rarr;
+                    <div class="pipe-step" id="step2">COMPARE</div> &rarr;
+                    <div class="pipe-step" id="step3">CHOOSE</div> &rarr;
+                    <div class="pipe-step" id="step4">ROUTE</div> &rarr;
+                    <div class="pipe-step" id="step5">MEASURE</div>
+                </div>
+
+                <button class="btn-primary" id="btnRoute">SEND TEST WORKLOAD</button>
+                <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1rem;">
+                    <button class="voice-btn" id="voiceBtn" aria-label="Ask Eco Intelligence by voice" title="Voice AI — uses browser Web Speech API">
+                        <span class="mic-icon" aria-hidden="true">🎤</span>
+                        <span id="voiceBtnLabel">ASK ECO INTELLIGENCE</span>
+                    </button>
+                    <span class="voice-state-label" id="voiceStateLabel" style="color:var(--text-secondary);">IDLE</span>
+                </div>
+                <div class="voice-transcript" id="voiceTranscript"></div>
+            </div>
+            <div class="globe-container" id="globeViz"></div>
+        </section>
+
+        <!-- Live Region Status -->
+        <section>
+            <h2>Live Region Status</h2>
+            <div class="cards-grid" id="regionCards">
+                <!-- Populated via JS -->
+            </div>
+        </section>
+
+        <!-- Live Trace & AI Explanation -->
+        <section class="split-section">
+            <div>
+                <h2>Live Trace</h2>
+                <div class="terminal" id="terminal">
+                    <div class="term-header">
+                        <div class="term-dot td-r"></div>
+                        <div class="term-dot td-y"></div>
+                        <div class="term-dot td-g"></div>
+                    </div>
+                    <div class="log-line">$ eco-router status</div>
+                    <div class="log-line mono" style="color:var(--text-secondary)">Awaiting workload dispatch...</div>
+                </div>
+            </div>
+            
+            <div class="ai-panel">
+                <div>
+                    <h3>Why This Region? (Eco Intelligence) <span class="ai-badge" id="aiSource">RULE-BASED</span></h3>
+                    <div class="ai-text" id="aiText">
+                        Awaiting routing decision to provide insight.
+                    </div>
+                </div>
+                <div class="ai-disclaimer">
+                    <strong>SYSTEM ROUTING DECISION:</strong> Routing is exclusively deterministic. AI explains the decision but cannot alter routing logic, health checks, or target selection.
+                </div>
+            </div>
+        </section>
+
+        <!-- Metrics & Impact -->
+        <section>
+            <h2>Impact Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h4>Requests Routed</h4>
+                    <div class="val" id="met-req">0</div>
+                </div>
+                <div class="metric-card">
+                    <h4>Carbon-Aware Decisions</h4>
+                    <div class="val" id="met-dec">0</div>
+                </div>
+                <div class="metric-card">
+                    <h4>ESTIMATED Potential Savings</h4>
+                    <div class="val" id="met-sav">0 <span style="font-size:1rem;font-weight:400;color:var(--text-secondary)">gCO₂e</span></div>
+                </div>
+                <div class="metric-card">
+                    <h4>Active Regions</h4>
+                    <div class="val" id="met-reg">3</div>
+                </div>
+            </div>
+            
+            <h3>Routing History</h3>
+            <div class="history-filters">
+                <button class="history-filter active" id="filterAll" onclick="filterHistory('all', this)">ALL</button>
+                <button class="history-filter" id="filterEU" onclick="filterHistory('eu-north-1', this)">EU NORTH</button>
+                <button class="history-filter" id="filterUS" onclick="filterHistory('us-east-1', this)">US EAST</button>
+                <button class="history-filter" id="filterAP" onclick="filterHistory('ap-south-1', this)">AP SOUTH</button>
+            </div>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Method</th>
+                            <th>Selected Region</th>
+                            <th>Intensity (gCO₂e/kWh)</th>
+                            <th>Data Source</th>
+                            <th>Est. Saving (gCO₂e)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTable">
+                        <!-- Populated via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        
+        <section id="how-it-works">
+            <h2>Responsible AI &amp; Data</h2>
+            <p style="color:var(--text-secondary); max-width:800px; line-height:1.6; margin-bottom:1rem;">
+                <strong>Simulation &amp; Data:</strong> This system uses simulated infrastructure regions. 
+                Data source may be live (Electricity Maps), cached, or mock. All mock data is clearly labelled as <span class="mono">SIMULATED GRID DATA</span>.
+            </p>
+            <p style="color:var(--text-secondary); max-width:800px; line-height:1.6;">
+                <strong>AI Limitations:</strong> The Eco Intelligence panel uses AI strictly for natural language explanation. 
+                The routing engine itself is 100% deterministic code to ensure transparency, fairness, and safety (no SSRF via AI hallucination).
+            </p>
+        </section>
+
+        <!-- Eco Intelligence Section -->
+        <section>
+            <div class="eco-intel-section">
+                <div class="eco-intel-header">
+                    <div>
+                        <div class="eco-intel-title">&#127807; Eco Intelligence</div>
+                        <div class="eco-intel-subtitle">AI-assisted infrastructure intelligence</div>
+                    </div>
+                    <button class="ai-analyze-btn" id="btnAnalyze" onclick="analyzeEcoIntelligence()">ANALYZE WITH ECO INTELLIGENCE</button>
+                </div>
+
+                <div class="eco-intel-disclaimer">
+                    <strong>Architecture principle:</strong> AI explains and analyzes routing telemetry. The routing engine remains <strong>deterministic and policy-controlled</strong>. AI cannot alter routing decisions, health checks, region selection, or infrastructure configuration.
+                </div>
+
+                <div class="eco-intel-loading" id="ecoIntelLoading">
+                    <span class="loading-dot">&#9679;</span>&nbsp;
+                    <span class="loading-dot" style="animation-delay:0.2s">&#9679;</span>&nbsp;
+                    <span class="loading-dot" style="animation-delay:0.4s">&#9679;</span>
+                    &nbsp; Eco Intelligence analyzing...
+                </div>
+
+                <div class="eco-intel-cards" id="ecoIntelCards" style="display:none;">
+                    <!-- Card 1: Decision Brief -->
+                    <div class="ei-card" id="eiCard1">
+                        <div class="ei-card-title">&#128203; AI Decision Brief</div>
+                        <div class="ei-card-body" id="eiDecisionSummary">Awaiting analysis...</div>
+                        <div class="ei-card-obs" id="eiDecisionObs"></div>
+                    </div>
+                    <!-- Card 2: Carbon Pattern -->
+                    <div class="ei-card" id="eiCard2">
+                        <div class="ei-card-title">&#127758; Carbon Pattern</div>
+                        <div class="ei-card-body" id="eiPatternSummary">Awaiting analysis...</div>
+                        <div class="ei-card-obs" id="eiPatternObs"></div>
+                    </div>
+                    <!-- Card 3: Engineering Insight -->
+                    <div class="ei-card" id="eiCard3">
+                        <div class="ei-card-title">&#9881;&#65039; Engineering Insight</div>
+                        <div class="ei-card-body" id="eiRecommendSummary">Awaiting analysis...</div>
+                        <div class="ei-card-recs" id="eiRecommendList"></div>
+                    </div>
+                </div>
+
+                <div class="eco-intel-meta" id="ecoIntelMeta" style="display:none;">
+                    <span>Based on Eco-Router telemetry</span>
+                    <span class="ai-status-badge" id="ecoIntelModeBadge">AI DEMO MODE</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             PHASE K: AI ECO INTELLIGENCE CONSOLE
+        ============================================================ -->
+        <section id="ai-console">
+            <div class="ai-ask-console">
+                <div class="ai-ask-header">
+                    <div>
+                        <div class="ai-ask-title">&#129302; ECO INTELLIGENCE — Ask Anything</div>
+                        <div style="color:var(--text-secondary);font-size:0.9rem;">AI-powered analysis grounded in Eco-Router telemetry. <strong>Routing remains deterministic.</strong></div>
+                    </div>
+                    <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+                        <span class="ai-status-badge ai-status-demo" id="askConsoleBadge">AI DEMO MODE</span>
+                        <button class="voice-btn" id="voiceBtnConsole" aria-label="Voice input for AI console" title="Speak your question">
+                            <span class="mic-icon" aria-hidden="true">&#127908;</span>
+                            <span id="voiceConsoleBtnLabel">VOICE</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div style="background:rgba(27,67,50,0.06);border-left:3px solid var(--forest);padding:0.75rem 1rem;border-radius:0 8px 8px 0;font-size:0.8rem;color:var(--text-secondary);margin-bottom:1.5rem;">
+                    <strong>RESPONSIBLE AI:</strong> AI analyzes telemetry and provides explanations and recommendations.
+                    Routing decisions remain deterministic and policy-controlled. AI cannot modify routing state, health checks, or infrastructure.
+                </div>
+
+                <div class="ai-quick-btns">
+                    <button class="ai-quick-btn" onclick="quickAsk('Why was the current region selected?')">WHY THIS REGION?</button>
+                    <button class="ai-quick-btn" onclick="quickAsk('Which region currently has the lowest carbon intensity?')">CLEANEST REGION</button>
+                    <button class="ai-quick-btn" onclick="quickAsk('Describe current carbon intensity trends across all regions.')">CARBON TRENDS</button>
+                    <button class="ai-quick-btn" onclick="quickAsk('What are the estimated potential carbon savings for the current routing decision?')">POTENTIAL SAVINGS</button>
+                    <button class="ai-quick-btn" onclick="quickAsk('How is infrastructure health across regions?')">INFRA HEALTH</button>
+                    <button class="ai-quick-btn" onclick="quickAsk('Provide engineering recommendations based on current telemetry.')">&#9881;&#65039; ENGINEERING INSIGHT</button>
+                </div>
+
+                <div class="ai-input-row">
+                    <input class="ai-input" id="aiAskInput" type="text"
+                        placeholder="e.g. Why was Europe selected? What are the carbon trends?"
+                        aria-label="Ask Eco Intelligence"
+                        onkeydown="if(event.key==='Enter') sendAiAsk()"
+                    >
+                    <button class="ai-ask-btn" id="aiAskBtn" onclick="sendAiAsk()">ASK</button>
+                </div>
+
+                <div class="ai-answer-box" id="aiAnswerBox">
+                    <div class="ai-answer-meta" id="aiAnswerMeta"></div>
+                    <div class="ai-answer-text" id="aiAnswerText"></div>
+                    <div class="ai-disclaimer-small">
+                        AI-GENERATED ANALYSIS &mdash; Based on Eco-Router telemetry only. Not a substitute for verified infrastructure monitoring.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             PHASE K: CARBON FORECAST PANEL
+        ============================================================ -->
+        <section id="forecast">
+            <div class="forecast-section">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:0.5rem;">
+                    <div>
+                        <h2 style="margin-bottom:0.25rem;">&#128202; Carbon Intensity Forecast</h2>
+                        <div style="color:var(--text-secondary);font-size:0.9rem;">Statistical exponential smoothing on historical readings. Requires sufficient data.</div>
+                    </div>
+                    <button class="ai-ask-btn" onclick="loadForecast()" id="forecastBtn">LOAD FORECAST</button>
+                </div>
+                <div class="forecast-label-bar">FORECAST &mdash; PREDICTED, NOT MEASURED &mdash; SIMULATED DATA SOURCE</div>
+                <div class="forecast-grid" id="forecastGrid">
+                    <div style="grid-column:1/-1;color:var(--text-secondary);text-align:center;padding:2rem;">Click LOAD FORECAST to fetch predictions.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             PHASE K: SUSTAINABILITY KNOWLEDGE (RAG)
+        ============================================================ -->
+        <section id="knowledge">
+            <div class="rag-section">
+                <h2 style="margin-bottom:0.5rem;">&#128218; Sustainability Knowledge Base</h2>
+                <div style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1rem;">BM25 retrieval from curated sustainability documents. Sources shown for each result.</div>
+                <div class="rag-prompts">
+                    <button class="rag-prompt-btn" onclick="ragSearch('What is carbon-aware computing?')">What is carbon-aware computing?</button>
+                    <button class="rag-prompt-btn" onclick="ragSearch('How does grid carbon intensity work?')">How does grid carbon intensity work?</button>
+                    <button class="rag-prompt-btn" onclick="ragSearch('What are the limitations of carbon-aware routing?')">Limitations of carbon-aware routing?</button>
+                    <button class="rag-prompt-btn" onclick="ragSearch('How should carbon savings be estimated?')">How to estimate carbon savings?</button>
+                    <button class="rag-prompt-btn" onclick="ragSearch('What responsible AI practices are used in Eco-Router?')">Responsible AI practices?</button>
+                    <button class="rag-prompt-btn" onclick="ragSearch('What is green software engineering?')">Green software engineering?</button>
+                </div>
+                <div class="rag-input-row">
+                    <input class="rag-input" id="ragInput" type="text" placeholder="Search knowledge base..." aria-label="Search sustainability knowledge" onkeydown="if(event.key==='Enter') ragSearch(document.getElementById('ragInput').value)">
+                    <button class="rag-search-btn" onclick="ragSearch(document.getElementById('ragInput').value)">SEARCH</button>
+                </div>
+                <div class="rag-results" id="ragResults"></div>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             PHASE K: BEFORE vs ECO-ROUTER COMPARISON
+        ============================================================ -->
+        <section id="impact">
+            <div class="comparison-section">
+                <h2 style="margin-bottom:0.25rem;">&#9889; BEFORE vs ECO-ROUTER</h2>
+                <div style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1rem;">Illustrates the routing difference. All savings are ESTIMATED from simulated data.</div>
+                <div class="comparison-grid">
+                    <div class="comparison-col">
+                        <div class="comparison-col-label">&#9654; Traditional Routing</div>
+                        <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.75rem;">Fixed target — nearest or random region</div>
+                        <div class="comparison-val" id="baselineVal">340</div>
+                        <div style="font-size:0.85rem;color:var(--text-secondary);">gCO₂e/kWh (highest simulated region)</div>
+                        <div class="comparison-desc" style="margin-top:1rem;">Workload routed to US East regardless of grid conditions.</div>
+                    </div>
+                    <div class="comparison-col eco">
+                        <div class="comparison-col-label">&#9996; With Eco-Router</div>
+                        <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.75rem;">Lowest-carbon available region</div>
+                        <div class="comparison-val eco-val" id="selectedVal">70</div>
+                        <div style="font-size:0.85rem;color:var(--text-secondary);">gCO₂e/kWh (currently selected)</div>
+                        <div class="comparison-desc" style="margin-top:1rem;" id="ecoRouterDesc">Deterministic engine selects lowest-carbon available region.</div>
+                        <div style="margin-top:1rem;">
+                            <div class="est-savings-label">ESTIMATED POTENTIAL SAVING</div>
+                            <div class="comparison-val eco-val" style="font-size:1.25rem;" id="savingPerReq">0.0000 gCO₂e</div>
+                            <div style="font-size:0.75rem;color:var(--text-secondary);">per request (simulated, not verified)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="comparison-formula">
+                    FORMULA (ESTIMATED):
+                    potential saving = (baseline_intensity − selected_intensity) &times; energy_per_request_kWh
+                    = (<span id="cfBaseline">340</span> − <span id="cfSelected">70</span>) &times; 0.0001 kWh
+                    = <span id="cfResult">0.0270</span> × 10⁻³ gCO₂e per request
+
+                    Note: All values are simulated. Not verified real-world emission reductions.
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             PHASE K: RESPONSIBLE AI (Full Section)
+        ============================================================ -->
+        <section id="responsible-ai">
+            <div class="responsible-ai-section">
+                <h2 style="margin-bottom:0.5rem;">&#9854; Responsible AI</h2>
+                <div style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:0.5rem;">How Eco-Router uses AI responsibly — with human oversight and clear limitations.</div>
+                <div class="rai-grid">
+                    <div class="rai-card">
+                        <span class="rai-icon">&#128683;</span>
+                        <div>
+                            <div class="rai-title">AI Does Not Control Routing</div>
+                            <div class="rai-desc">All routing decisions are made by the deterministic carbon-aware engine. The AI cannot override health checks, select regions, or modify infrastructure state.</div>
+                        </div>
+                    </div>
+                    <div class="rai-card">
+                        <span class="rai-icon">&#128270;</span>
+                        <div>
+                            <div class="rai-title">Grounded in Telemetry</div>
+                            <div class="rai-desc">AI responses use only supplied Eco-Router telemetry and curated knowledge documents. AI does not access the internet or fabricate metrics.</div>
+                        </div>
+                    </div>
+                    <div class="rai-card">
+                        <span class="rai-icon">&#128202;</span>
+                        <div>
+                            <div class="rai-title">Forecasts Are Labelled Predictions</div>
+                            <div class="rai-desc">All forecast values are explicitly labelled FORECAST — PREDICTED, NOT MEASURED. Insufficient data results in a clear INSUFFICIENT DATA message, not fabricated values.</div>
+                        </div>
+                    </div>
+                    <div class="rai-card">
+                        <span class="rai-icon">&#128100;</span>
+                        <div>
+                            <div class="rai-title">Human Oversight Preserved</div>
+                            <div class="rai-desc">AI recommendations are advisory only. Engineers can override routing policy via configuration. No automated infrastructure changes are triggered by AI output.</div>
+                        </div>
+                    </div>
+                    <div class="rai-card">
+                        <span class="rai-icon">&#128274;</span>
+                        <div>
+                            <div class="rai-title">No API Keys Exposed</div>
+                            <div class="rai-desc">API keys (Gemini, Electricity Maps) are never included in HTML, JavaScript, or browser responses. Missing keys trigger AI DEMO MODE gracefully.</div>
+                        </div>
+                    </div>
+                    <div class="rai-card">
+                        <span class="rai-icon">&#128290;</span>
+                        <div>
+                            <div class="rai-title">ESTIMATED Savings Only</div>
+                            <div class="rai-desc">All carbon saving figures are estimates derived from simulated data and configurable assumptions. The platform explicitly avoids claiming verified real-world emission reductions.</div>
+                        </div>
+                    </div>
+                    <div class="rai-card">
+                        <span class="rai-icon">&#127908;</span>
+                        <div>
+                            <div class="rai-title">Voice Data Not Stored</div>
+                            <div class="rai-desc">Voice recognition uses the browser's native Web Speech API. Audio is processed locally by the browser — only the transcribed text is sent to the backend AI endpoint.</div>
+                        </div>
+                    </div>
+                    <div class="rai-card">
+                        <span class="rai-icon">&#128200;</span>
+                        <div>
+                            <div class="rai-title">Mock Data Clearly Labelled</div>
+                            <div class="rai-desc">All simulated carbon intensity values are labelled SIMULATED GRID DATA. Data source (mock/live/cached/stale) is always shown in the UI and API responses.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        <p>ECO-ROUTER &mdash; Carbon-Aware Global Routing | Independent climate-tech infrastructure project.</p>
+        <p style="margin-top:0.5rem; color:var(--text-secondary);">Supporting SDG 13: Climate Action</p>
+    </footer>
+
+    <script>
+        // Coordinates for simulated regions
+        const REGION_COORDS = {
+            "us-east-1": { lat: 37.43, lng: -79.00, name: "Virginia, USA" },
+            "eu-north-1": { lat: 59.33, lng: 18.07, name: "Stockholm, Sweden" },
+            "ap-south-1": { lat: 19.08, lng: 72.88, name: "Mumbai, India" }
+        };
+        const CLIENT_COORDS = { lat: 40.71, lng: -74.00, name: "New York (Simulated Origin)" };
+
+        let globe = null;
+        let currentCarbonData = {};
+        let currentSelectedRegion = null;
+        let isRouting = false;
+
+        // Initialize Globe
+        function initGlobe() {
+            const container = document.getElementById('globeViz');
+            
+            // Check WebGL support
+            try {
+                const canvas = document.createElement('canvas');
+                if (!window.WebGLRenderingContext || (!canvas.getContext('webgl') && !canvas.getContext('experimental-webgl'))) {
+                    throw new Error("WebGL not supported");
+                }
+            } catch(e) {
+                container.innerHTML = '<div style="padding:2rem;text-align:center;">3D Globe requires WebGL support.</div>';
+                return;
+            }
+
+            globe = Globe()(container)
+                .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-day.jpg')
+                .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+                .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+                .atmosphereColor('#4fc3f7')
+                .atmosphereAltitude(0.18)
+                .pointOfView({ lat: 30, lng: -20, altitude: 2.5 })
+                .htmlElementsData(Object.keys(REGION_COORDS).map(id => ({ id, ...REGION_COORDS[id] })))
+                .htmlElement(d => {
+                    const el = document.createElement('div');
+                    el.className = `marker`;
+                    el.id = `marker-${d.id}`;
+                    el.innerHTML = `
+                        <div class="dot"></div>
+                        <div>
+                            <div>${d.id.toUpperCase()}</div>
+                            <div class="val" id="marker-val-${d.id}">...</div>
+                        </div>
+                    `;
+                    return el;
+                });
+
+            // Auto-rotate
+            globe.controls().autoRotate = true;
+            globe.controls().autoRotateSpeed = 0.5;
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                globe.width(container.clientWidth).height(container.clientHeight);
+            });
+        }
+
+        // Fetch Auth Status
+        async function checkAuth() {
+            const nav = document.getElementById('authNav');
+            try {
+                const res = await fetch('/auth/me');
+                if (res.ok) {
+                    const user = await res.json();
+                    nav.innerHTML = `
+                        <span style="margin-right:1rem;font-weight:600;color:var(--forest)">${user.name}</span>
+                        <a href="#" onclick="logout(event)" class="btn-outline">Sign Out</a>
+                    `;
+                } else {
+                    nav.innerHTML = `
+                        <a href="/login" style="margin-right:1.5rem">Sign In</a>
+                        <a href="/register" class="btn-outline">Create Account</a>
+                    `;
+                }
+            } catch (e) {
+                nav.innerHTML = `
+                    <a href="/login" style="margin-right:1.5rem">Sign In</a>
+                    <a href="/register" class="btn-outline">Create Account</a>
+                `;
+            }
+        }
+
+        async function logout(e) {
+            e.preventDefault();
+            await fetch('/auth/logout', { method: 'POST' });
+            window.location.reload();
+        }
+
+        // Fetch Data
+        async function updateDashboardData() {
+            if (isRouting) return; // Don't interrupt animation
+            
+            try {
+                const [healthRes, carbonRes, decisionRes, metricsRes, historyRes] = await Promise.all([
+                    fetch('/health'),
+                    fetch('/carbon'),
+                    fetch('/decision'),
+                    fetch('/metrics'),
+                    fetch('/history?limit=5')
+                ]);
+
+                if (healthRes.ok) {
+                    const h = await healthRes.json();
+                    document.getElementById('met-reg').textContent = Object.values(h.regions).filter(x => x === 'available').length;
+                }
+
+                if (carbonRes.ok) {
+                    const c = await carbonRes.json();
+                    currentCarbonData = {};
+                    c.regions.forEach(r => currentCarbonData[r.region] = r);
+                    renderCards();
+                    updateMarkers();
+                }
+
+                if (decisionRes.ok) {
+                    const d = await decisionRes.json();
+                    currentSelectedRegion = d.selected_region;
+                    highlightSelected();
+                }
+
+                if (metricsRes.ok) {
+                    const m = await metricsRes.json();
+                    document.getElementById('met-req').textContent = m.total_requests;
+                    document.getElementById('met-dec').textContent = m.total_requests;
+                    document.getElementById('met-sav').innerHTML = `${(m.total_savings_gco2e || 0).toFixed(4)} <span style="font-size:1rem;font-weight:400;color:var(--text-secondary)">gCO₂e</span>`;
+                }
+                
+                if (historyRes.ok) {
+                    const hist = await historyRes.json();
+                    renderHistory(hist);
+                }
+
+            } catch (err) {
+                console.error("Error fetching data:", err);
+            }
+        }
+
+        function getColorClass(val) {
+            if (val <= 100) return "low";
+            if (val <= 250) return "med";
+            return "high";
+        }
+        function getBgClass(val) {
+            if (val <= 100) return "bg-low";
+            if (val <= 250) return "bg-med";
+            return "bg-high";
+        }
+
+        function renderCards() {
+            const container = document.getElementById('regionCards');
+            container.innerHTML = '';
+            
+            Object.keys(REGION_COORDS).forEach(id => {
+                const data = currentCarbonData[id];
+                if (!data) return;
+                
+                const val = data.carbon_intensity;
+                const cColor = getColorClass(val);
+                const cBg = getBgClass(val);
+                const isSelected = id === currentSelectedRegion;
+                
+                const card = document.createElement('div');
+                card.className = `card ${isSelected ? 'selected' : ''}`;
+                const sourceClass = data.source === 'mock' ? 'source-mock' : 'source-live';
+                card.innerHTML = `
+                    <h3>${id.toUpperCase()}</h3>
+                    <div class="location">${REGION_COORDS[id].name}</div>
+                    <div class="intensity-val ${cColor} mono">${Math.round(val)}</div>
+                    <div class="intensity-unit">gCO₂e/kWh</div>
+                    <div class="status-badge ${cBg} source-badge ${sourceClass}">
+                        ${data.source === 'mock' ? 'SIMULATED DATA' : data.source.toUpperCase() + ' DATA'}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        function updateMarkers() {
+            Object.keys(REGION_COORDS).forEach(id => {
+                const el = document.getElementById(`marker-val-${id}`);
+                if (el && currentCarbonData[id]) {
+                    const val = currentCarbonData[id].carbon_intensity;
+                    el.textContent = `${Math.round(val)} gCO₂e`;
+                    el.className = `val ${getColorClass(val)}`;
+                }
+            });
+        }
+
+        function highlightSelected() {
+            document.querySelectorAll('.marker').forEach(el => el.classList.remove('selected'));
+            if (currentSelectedRegion) {
+                const sel = document.getElementById(`marker-${currentSelectedRegion}`);
+                if (sel) sel.classList.add('selected');
+            }
+        }
+
+        function renderHistory(hist) {
+            const tbody = document.getElementById('historyTable');
+            tbody.innerHTML = '';
+            hist.forEach(r => {
+                const tr = document.createElement('tr');
+                const time = new Date(r.timestamp).toLocaleTimeString();
+                const cColor = getColorClass(r.selected_intensity);
+                tr.innerHTML = `
+                    <td>${time}</td>
+                    <td class="mono">${r.method}</td>
+                    <td class="mono" style="font-weight:600">${r.selected_region}</td>
+                    <td class="mono ${cColor}">${r.selected_intensity.toFixed(1)}</td>
+                    <td><span class="sys-status" style="display:inline-block">${r.carbon_data_source}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Terminal Log
+        function logTerm(msg, type="info") {
+            const t = document.getElementById('terminal');
+            const d = document.createElement('div');
+            d.className = 'log-line mono';
+            
+            let prefix = "";
+            if (type === "grid") prefix = '<span class="log-prefix">[GRID]</span> ';
+            if (type === "engine") prefix = '<span class="log-prefix" style="color:#00c8d4">[ENGINE]</span> ';
+            if (type === "route") prefix = '<span class="log-prefix" style="color:var(--forest-light)">[ROUTE]</span> ';
+            if (type === "success") {
+                prefix = '<span class="log-success">[STATUS]</span> ';
+                d.classList.add('log-success');
+            }
+            if (type === "error") {
+                prefix = '<span style="color:var(--danger)">[ERROR]</span> ';
+                d.style.color = 'var(--danger)';
+            }
+            
+            d.innerHTML = prefix + msg;
+            t.appendChild(d);
+            t.scrollTop = t.scrollHeight;
+        }
+
+        // Pipeline UI
+        function setStep(num) {
+            for(let i=1; i<=5; i++) {
+                const el = document.getElementById(`step${i}`);
+                if (i <= num) el.classList.add('active');
+                else el.classList.remove('active');
+            }
+        }
+
+        // Run Routing Demo
+        document.getElementById('btnRoute').addEventListener('click', async () => {
+            if (isRouting) return;
+            isRouting = true;
+            const btn = document.getElementById('btnRoute');
+            btn.disabled = true;
+            btn.textContent = 'ANALYZING GRID...';
+            
+            document.getElementById('terminal').innerHTML = `
+                <div class="term-header">
+                    <div class="term-dot td-r"></div>
+                    <div class="term-dot td-y"></div>
+                    <div class="term-dot td-g"></div>
+                </div>
+            `;
+            
+            setStep(1);
+            logTerm("Initiating carbon-aware proxy request...", "info");
+            logTerm("checking regional health and carbon intensity...", "grid");
+            
+            await new Promise(r => setTimeout(r, 600));
+            setStep(2);
+            
+            try {
+                // Actually call proxy
+                const res = await fetch('/proxy/api/task', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ simulated: true, payload: "demo" })
+                });
+                
+                setStep(3);
+                logTerm("comparing eligible candidates...", "engine");
+                
+                const selectedRegion = res.headers.get('X-Eco-Router-Region');
+                const intensity = res.headers.get('X-Carbon-Intensity');
+                
+                await new Promise(r => setTimeout(r, 500));
+                
+                if (selectedRegion) {
+                    btn.textContent = 'ROUTING...';
+                    setStep(4);
+                    logTerm(`selected optimal region: ${selectedRegion} (${intensity} gCO₂e/kWh)`, "engine");
+                    logTerm(`forwarding payload...`, "route");
+                    
+                    // Draw arc on globe
+                    const targetCoords = REGION_COORDS[selectedRegion];
+                    if (globe && targetCoords) {
+                        globe.controls().autoRotate = false;
+                        globe.pointOfView({ lat: targetCoords.lat, lng: targetCoords.lng, altitude: 1.5 }, 1500);
+                        
+                        globe.arcsData([{
+                            startLat: CLIENT_COORDS.lat,
+                            startLng: CLIENT_COORDS.lng,
+                            endLat: targetCoords.lat,
+                            endLng: targetCoords.lng,
+                            color: ['#A08040', '#00e080']
+                        }]);
+                        
+                        globe
+                          .arcColor('color')
+                          .arcDashLength(0.4)
+                          .arcDashGap(4)
+                          .arcDashInitialGap(() => Math.random() * 4)
+                          .arcDashAnimateTime(1500);
+                    }
+                    
+                    await new Promise(r => setTimeout(r, 1500));
+                    
+                    setStep(5);
+                    logTerm(`workload delivered successfully to ${selectedRegion}.`, "success");
+                    btn.textContent = `✓ ROUTED TO ${selectedRegion.toUpperCase()}`;
+                    
+                    // Update old AI insight badge (backwards compat)
+                    fetchAIInsight();
+                    
+                    // Cleanup arc after a while
+                    setTimeout(() => {
+                        if (globe) {
+                            globe.arcsData([]);
+                            globe.controls().autoRotate = true;
+                        }
+                    }, 4000);
+                    
+                } else {
+                    logTerm("Proxy failed: no region header returned.", "error");
+                    btn.textContent = 'ROUTING FAILED';
+                }
+            } catch (e) {
+                logTerm(`Network error: ${e.message}`, "error");
+                btn.textContent = 'ERROR';
+            }
+            
+            setTimeout(() => {
+                isRouting = false;
+                btn.disabled = false;
+                btn.textContent = 'SEND TEST WORKLOAD';
+                setStep(0);
+                updateDashboardData();
+            }, 5000);
+        });
+        
+        async function fetchAIInsight() {
+            try {
+                const res = await fetch('/ai/insight', { method: 'POST', body: '{}' });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('aiSource').textContent = data.source.toUpperCase();
+                    document.getElementById('aiText').textContent = data.insight;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // ── Eco Intelligence ─────────────────────────────────────────────────
+        async function analyzeEcoIntelligence() {
+            const btn = document.getElementById('btnAnalyze');
+            const loading = document.getElementById('ecoIntelLoading');
+            const cards = document.getElementById('ecoIntelCards');
+            const meta = document.getElementById('ecoIntelMeta');
+
+            btn.disabled = true;
+            btn.textContent = 'ANALYZING...';
+            loading.classList.add('active');
+            cards.style.display = 'none';
+            meta.style.display = 'none';
+
+            try {
+                // Step 1: Gather telemetry from existing APIs (no key exposure)
+                const [decisionRes, carbonRes, historyRes, metricsRes, healthRes] = await Promise.all([
+                    fetch('/decision'),
+                    fetch('/carbon'),
+                    fetch('/history?limit=20'),
+                    fetch('/metrics'),
+                    fetch('/health'),
+                ]);
+
+                const decision = decisionRes.ok ? await decisionRes.json() : {};
+                const carbonData = carbonRes.ok ? await carbonRes.json() : { regions: [] };
+                const history = historyRes.ok ? await historyRes.json() : [];
+                const metrics = metricsRes.ok ? await metricsRes.json() : {};
+                const health = healthRes.ok ? await healthRes.json() : { regions: {} };
+
+                // Build structured requests (no GEMINI_API_KEY in frontend)
+                const explainPayload = {
+                    selected_region: decision.selected_region || 'unknown',
+                    selected_intensity: decision.carbon_intensity || 0,
+                    carbon_data_source: decision.carbon_data_source || 'mock',
+                    reason: decision.reason || '',
+                    candidates: decision.alternatives || {},
+                    unavailable_regions: decision.unavailable_regions || [],
+                    estimated_savings_gco2e: decision.estimated_savings_gco2e || null,
+                };
+
+                const carbonReadings = {};
+                (carbonData.regions || []).forEach(r => { carbonReadings[r.region] = r.carbon_intensity; });
+
+                const historyPayload = {
+                    history: (history || []).map(h => ({
+                        timestamp: h.timestamp,
+                        selected_region: h.selected_region,
+                        selected_intensity: h.selected_intensity,
+                        carbon_data_source: h.carbon_data_source,
+                        reason: h.reason,
+                        estimated_savings_gco2e: h.estimated_savings_gco2e,
+                    })),
+                    carbon_readings: carbonReadings,
+                };
+
+                const recommendPayload = {
+                    history: historyPayload.history.slice(0, 20),
+                    carbon_readings: carbonReadings,
+                    health_status: health.regions || {},
+                    total_requests: metrics.total_requests || 0,
+                    routing_by_region: metrics.routing_by_region || {},
+                    carbon_provider: health.carbon_provider || 'mock',
+                };
+
+                // Step 2: Call all three AI endpoints concurrently
+                const [explainRes, historyAiRes, recommendRes] = await Promise.all([
+                    fetch('/ai/explain-decision', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(explainPayload) }),
+                    fetch('/ai/analyze-history', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(historyPayload) }),
+                    fetch('/ai/recommend', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(recommendPayload) }),
+                ]);
+
+                const explainData = explainRes.ok ? await explainRes.json() : null;
+                const historyAiData = historyAiRes.ok ? await historyAiRes.json() : null;
+                const recommendData = recommendRes.ok ? await recommendRes.json() : null;
+
+                // Step 3: Render results
+                loading.classList.remove('active');
+                cards.style.display = 'grid';
+                meta.style.display = 'flex';
+
+                // Determine mode from any response
+                const anyMode = (explainData || historyAiData || recommendData || {}).mode || 'AI_DEMO_MODE';
+                const badgeEl = document.getElementById('ecoIntelModeBadge');
+                if (anyMode === 'AI_ANALYSIS') {
+                    badgeEl.textContent = 'AI ANALYSIS';
+                    badgeEl.className = 'ai-status-badge ai-status-live';
+                } else {
+                    badgeEl.textContent = 'AI DEMO MODE';
+                    badgeEl.className = 'ai-status-badge ai-status-demo';
+                }
+
+                // Card 1: Decision Brief
+                if (explainData) {
+                    document.getElementById('eiDecisionSummary').textContent = explainData.summary || 'No summary available.';
+                    const obsEl = document.getElementById('eiDecisionObs');
+                    if (explainData.observations && explainData.observations.length) {
+                        obsEl.innerHTML = '<ul>' + explainData.observations.map(o => `<li>${o}</li>`).join('') + '</ul>';
+                    }
+                }
+
+                // Card 2: Carbon Pattern
+                if (historyAiData) {
+                    document.getElementById('eiPatternSummary').textContent = historyAiData.summary || 'Insufficient data.';
+                    const obsEl = document.getElementById('eiPatternObs');
+                    if (historyAiData.observations && historyAiData.observations.length) {
+                        obsEl.innerHTML = '<ul>' + historyAiData.observations.map(o => `<li>${o}</li>`).join('') + '</ul>';
+                    }
+                }
+
+                // Card 3: Engineering Insight
+                if (recommendData) {
+                    document.getElementById('eiRecommendSummary').textContent = recommendData.summary || '';
+                    const recEl = document.getElementById('eiRecommendList');
+                    const allRecs = [
+                        ...(recommendData.recommendations || []),
+                    ];
+                    if (allRecs.length) {
+                        recEl.innerHTML = '<ul>' + allRecs.map(r => `<li>${r}</li>`).join('') + '</ul>';
+                    }
+                }
+
+                // Animate cards in
+                setTimeout(() => { document.getElementById('eiCard1').classList.add('visible'); }, 50);
+                setTimeout(() => { document.getElementById('eiCard2').classList.add('visible'); }, 150);
+                setTimeout(() => { document.getElementById('eiCard3').classList.add('visible'); }, 250);
+
+            } catch (err) {
+                console.error('Eco Intelligence error:', err);
+                loading.classList.remove('active');
+                // Show demo fallback notice
+                cards.style.display = 'grid';
+                meta.style.display = 'flex';
+                document.getElementById('eiDecisionSummary').textContent = 'Analysis unavailable. Please check backend connectivity.';
+                document.getElementById('eiPatternSummary').textContent = 'Analysis unavailable.';
+                document.getElementById('eiRecommendSummary').textContent = 'Analysis unavailable.';
+                document.getElementById('ecoIntelModeBadge').textContent = 'ERROR';
+                document.getElementById('ecoIntelModeBadge').className = 'ai-status-badge ai-status-demo';
+                document.getElementById('eiCard1').classList.add('visible');
+                document.getElementById('eiCard2').classList.add('visible');
+                document.getElementById('eiCard3').classList.add('visible');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'ANALYZE WITH ECO INTELLIGENCE';
+            }
+        }
+
+        // ── Enhanced History Rendering (Phase K) ──────────────────────────────
+        let allHistory = [];
+        let activeHistoryFilter = 'all';
+
+        function filterHistory(region, btn) {
+            activeHistoryFilter = region;
+            document.querySelectorAll('.history-filter').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderHistory(allHistory);
+        }
+
+        function renderHistory(hist) {
+            allHistory = hist;
+            const tbody = document.getElementById('historyTable');
+            tbody.innerHTML = '';
+            const filtered = activeHistoryFilter === 'all'
+                ? hist
+                : hist.filter(r => r.selected_region === activeHistoryFilter);
+
+            filtered.forEach(r => {
+                const tr = document.createElement('tr');
+                const time = new Date(r.timestamp).toLocaleTimeString();
+                const cColor = getColorClass(r.selected_intensity);
+                const savText = r.estimated_savings_gco2e != null
+                    ? r.estimated_savings_gco2e.toFixed(6)
+                    : '—';
+                const success = r.success !== false;
+                tr.innerHTML = `
+                    <td class="mono">${time}</td>
+                    <td class="mono">${r.method}</td>
+                    <td class="mono" style="font-weight:600">${r.selected_region}</td>
+                    <td class="mono ${cColor}">${r.selected_intensity.toFixed(1)}</td>
+                    <td><span class="sys-status" style="display:inline-block">${r.carbon_data_source}</span></td>
+                    <td class="savings-cell">${savText}</td>
+                    <td><span class="${success ? 'badge-success' : 'badge-error'}">${success ? 'OK' : 'ERR'}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ── Before/After Comparison Updater (Phase K) ─────────────────────────
+        function updateComparison(decisionData) {
+            if (!decisionData) return;
+            const selected = decisionData.carbon_intensity || 70;
+            const baseline = 340; // Highest simulated region (US East)
+            const energyKwh = 0.0001;
+            const saving = (baseline - selected) * energyKwh;
+
+            const sv = document.getElementById('selectedVal');
+            const spr = document.getElementById('savingPerReq');
+            const cfSel = document.getElementById('cfSelected');
+            const cfRes = document.getElementById('cfResult');
+            const ecoDesc = document.getElementById('ecoRouterDesc');
+
+            if (sv) sv.textContent = Math.round(selected);
+            if (spr) spr.textContent = `${saving.toFixed(6)} gCO₂e`;
+            if (cfSel) cfSel.textContent = Math.round(selected);
+            if (cfRes) cfRes.textContent = saving.toFixed(6);
+            if (ecoDesc) ecoDesc.textContent = `${decisionData.selected_region} selected — ${decisionData.reason || 'lowest available carbon intensity'}`;
+        }
+
+        // Hook into existing updateDashboardData to also update comparison
+        const _origUpdateDashboard = updateDashboardData;
+        async function updateDashboardData() {
+            if (isRouting) return;
+            try {
+                const [healthRes, carbonRes, decisionRes, metricsRes, historyRes] = await Promise.all([
+                    fetch('/health'),
+                    fetch('/carbon'),
+                    fetch('/decision'),
+                    fetch('/metrics'),
+                    fetch('/history?limit=20')
+                ]);
+
+                if (healthRes.ok) {
+                    const h = await healthRes.json();
+                    document.getElementById('met-reg').textContent = Object.values(h.regions).filter(x => x === 'available').length;
+                }
+
+                if (carbonRes.ok) {
+                    const c = await carbonRes.json();
+                    currentCarbonData = {};
+                    c.regions.forEach(r => currentCarbonData[r.region] = r);
+                    renderCards();
+                    updateMarkers();
+                }
+
+                if (decisionRes.ok) {
+                    const d = await decisionRes.json();
+                    currentSelectedRegion = d.selected_region;
+                    highlightSelected();
+                    updateComparison(d);
+                }
+
+                if (metricsRes.ok) {
+                    const m = await metricsRes.json();
+                    document.getElementById('met-req').textContent = m.total_requests;
+                    document.getElementById('met-dec').textContent = m.total_requests;
+                    document.getElementById('met-sav').innerHTML = `${(m.total_savings_gco2e || 0).toFixed(4)} <span style="font-size:1rem;font-weight:400;color:var(--text-secondary)">gCO₂e</span>`;
+                }
+
+                if (historyRes.ok) {
+                    const hist = await historyRes.json();
+                    renderHistory(hist);
+                }
+            } catch (err) {
+                console.error("Error fetching data:", err);
+            }
+        }
+
+        // ── Toast Notifications ───────────────────────────────────────────────
+        function showToast(msg, type = 'success') {
+            const c = document.getElementById('toast-container');
+            if (!c) return;
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.textContent = msg;
+            c.appendChild(t);
+            setTimeout(() => {
+                t.style.animation = 'toast-out 0.3s ease forwards';
+                setTimeout(() => t.remove(), 300);
+            }, 3500);
+        }
+
+        // ── Phase K: AI Ask Console ───────────────────────────────────────────
+        async function sendAiAsk(prefillText) {
+            const input = document.getElementById('aiAskInput');
+            const btn = document.getElementById('aiAskBtn');
+            const answerBox = document.getElementById('aiAnswerBox');
+            const answerMeta = document.getElementById('aiAnswerMeta');
+            const answerText = document.getElementById('aiAnswerText');
+            const badgeEl = document.getElementById('askConsoleBadge');
+
+            const question = prefillText || input.value.trim();
+            if (!question) { input.focus(); return; }
+
+            btn.disabled = true;
+            btn.textContent = 'ASKING...';
+
+            // Gather current telemetry (no keys sent to frontend)
+            let context = {};
+            try {
+                const [dRes, cRes, hRes] = await Promise.all([
+                    fetch('/decision'), fetch('/carbon'), fetch('/history?limit=10')
+                ]);
+                if (dRes.ok) {
+                    const d = await dRes.json();
+                    context = {
+                        selected_region: d.selected_region,
+                        selected_intensity: d.carbon_intensity,
+                        reason: d.reason,
+                        alternatives: d.alternatives,
+                        unavailable_regions: d.unavailable_regions,
+                    };
+                }
+                if (cRes.ok) {
+                    const c = await cRes.json();
+                    context.carbon_readings = {};
+                    (c.regions || []).forEach(r => { context.carbon_readings[r.region] = r.carbon_intensity; });
+                }
+                if (hRes.ok) {
+                    const h = await hRes.json();
+                    context.recent_history = (h || []).slice(0, 5).map(r => ({
+                        selected_region: r.selected_region,
+                        selected_intensity: r.selected_intensity,
+                        timestamp: r.timestamp,
+                    }));
+                }
+            } catch(e) {}
+
+            try {
+                const res = await fetch('/ai/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question, context })
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                // Update mode badge
+                const mode = data.mode || 'AI_DEMO_MODE';
+                if (mode === 'AI_ANALYSIS') {
+                    badgeEl.textContent = 'AI ANALYSIS';
+                    badgeEl.className = 'ai-status-badge ai-status-live';
+                } else {
+                    badgeEl.textContent = 'AI DEMO MODE';
+                    badgeEl.className = 'ai-status-badge ai-status-demo';
+                }
+
+                // Show meta pills
+                answerMeta.innerHTML = [
+                    `<span class="ai-meta-pill">&#129302; ${data.agent || 'orchestrator'}</span>`,
+                    `<span class="ai-meta-pill">&#127919; ${data.intent || 'unknown'}</span>`,
+                    `<span class="ai-meta-pill">&#128200; ${mode}</span>`,
+                    data.confidence ? `<span class="ai-meta-pill">confidence: ${(data.confidence * 100).toFixed(0)}%</span>` : '',
+                ].filter(Boolean).join('');
+
+                answerText.textContent = data.answer || data.summary || 'No answer returned.';
+                answerBox.classList.add('visible');
+
+                // Speak the answer (Phase J TTS)
+                speakText(data.answer || data.summary || '');
+
+            } catch(e) {
+                answerText.textContent = 'Unable to reach Eco Intelligence. Please check that the backend is running.';
+                answerMeta.innerHTML = '<span class="ai-meta-pill" style="color:var(--danger)">ERROR</span>';
+                answerBox.classList.add('visible');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'ASK';
+            }
+        }
+
+        function quickAsk(text) {
+            document.getElementById('aiAskInput').value = text;
+            const aiSection = document.getElementById('ai-console');
+            if (aiSection) aiSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            sendAiAsk(text);
+        }
+
+        // ── Phase K: Forecast Panel ───────────────────────────────────────────
+        async function loadForecast() {
+            const grid = document.getElementById('forecastGrid');
+            const btn = document.getElementById('forecastBtn');
+            btn.disabled = true;
+            btn.textContent = 'LOADING...';
+            grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-secondary);text-align:center;padding:2rem;">Fetching forecast data...</div>';
+
+            try {
+                const res = await fetch('/forecast?horizon_steps=4');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                grid.innerHTML = '';
+                const regions = data.regions || [];
+
+                if (!regions.length) {
+                    grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-secondary);text-align:center;padding:2rem;">No forecast data available.</div>';
+                    return;
+                }
+
+                regions.forEach(r => {
+                    const card = document.createElement('div');
+                    card.className = 'forecast-region-card';
+
+                    const displayName = REGION_COORDS[r.region]
+                        ? `${r.region.toUpperCase()} — ${REGION_COORDS[r.region].name}`
+                        : r.region.toUpperCase();
+
+                    let stepsHTML = '';
+                    if (r.status === 'insufficient_data') {
+                        stepsHTML = `<div class="forecast-insufficient">INSUFFICIENT DATA — more routing history needed for statistical forecasting.</div>`;
+                    } else {
+                        const current = r.current_intensity;
+                        const cColor = getColorClass(current);
+                        stepsHTML += `
+                            <div class="forecast-step current">
+                                <div><span class="forecast-step-label">CURRENT</span></div>
+                                <div class="forecast-val ${cColor}">${current.toFixed(1)} gCO₂e/kWh</div>
+                            </div>
+                        `;
+                        (r.forecast_steps || []).forEach((step, i) => {
+                            const sc = getColorClass(step.value);
+                            stepsHTML += `
+                                <div class="forecast-step">
+                                    <div><span class="forecast-step-label">FORECAST +${i + 1}</span> <small style="color:var(--text-secondary)">${step.label || ''}</small></div>
+                                    <div class="forecast-val ${sc}">${step.value.toFixed(1)} gCO₂e/kWh</div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    card.innerHTML = `
+                        <div class="forecast-region-title">${displayName}</div>
+                        <div class="forecast-steps">${stepsHTML}</div>
+                    `;
+                    grid.appendChild(card);
+                });
+
+                showToast('Forecast loaded — predictions, not measurements', 'success');
+            } catch(e) {
+                grid.innerHTML = `<div style="grid-column:1/-1;color:var(--danger);text-align:center;padding:2rem;">Forecast unavailable: ${e.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'LOAD FORECAST';
+            }
+        }
+
+        // ── Phase K: RAG Knowledge Search ─────────────────────────────────────
+        async function ragSearch(query) {
+            if (!query) return;
+            document.getElementById('ragInput').value = query;
+            const results = document.getElementById('ragResults');
+            results.innerHTML = '<div style="color:var(--text-secondary);padding:1rem;">Searching knowledge base...</div>';
+
+            try {
+                const res = await fetch(`/ai/knowledge/search?q=${encodeURIComponent(query)}&top_k=3`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                const chunks = data.results || [];
+                if (!chunks.length) {
+                    results.innerHTML = '<div style="color:var(--text-secondary);padding:1rem;">No relevant knowledge found for this query.</div>';
+                    return;
+                }
+
+                results.innerHTML = chunks.map(c => {
+                    const source = (c.source || 'unknown').replace('.md', '').replace(/_/g, ' ').toUpperCase();
+                    const score = c.score != null ? `score: ${c.score.toFixed(3)}` : '';
+                    const text = (c.text || c.content || '').substring(0, 400);
+                    return `
+                        <div class="rag-chunk">
+                            <div class="rag-chunk-header">
+                                <span class="rag-source-tag">&#128218; ${source}</span>
+                                <span class="rag-score-tag">${score}</span>
+                            </div>
+                            <div class="rag-chunk-text">${text}${text.length >= 400 ? '...' : ''}</div>
+                        </div>
+                    `;
+                }).join('');
+            } catch(e) {
+                results.innerHTML = `<div style="color:var(--danger);padding:1rem;">Knowledge search unavailable: ${e.message}</div>`;
+            }
+        }
+
+        // ── Phase J: Voice AI ─────────────────────────────────────────────────
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let voiceRecognition = null;
+        let voiceTarget = null; // 'hero' | 'console'
+        const VOICE_STATES = { IDLE: 'IDLE', LISTENING: 'LISTENING', PROCESSING: 'PROCESSING', ANSWERING: 'ANSWERING', UNAVAILABLE: 'UNAVAILABLE' };
+
+        function setVoiceState(state, target) {
+            const stateEl = document.getElementById('voiceStateLabel');
+            const heroBtn = document.getElementById('voiceBtn');
+            const heroLbl = document.getElementById('voiceBtnLabel');
+            const consoleBtn = document.getElementById('voiceBtnConsole');
+            const consoleLbl = document.getElementById('voiceConsoleBtnLabel');
+
+            if (stateEl) stateEl.textContent = state;
+
+            const activeBtn = target === 'console' ? consoleBtn : heroBtn;
+            const activeLbl = target === 'console' ? consoleLbl : heroLbl;
+
+            [heroBtn, consoleBtn].forEach(btn => {
+                if (btn) { btn.classList.remove('listening', 'processing'); btn.disabled = false; }
+            });
+
+            if (activeBtn && activeLbl) {
+                switch(state) {
+                    case VOICE_STATES.LISTENING:
+                        activeBtn.classList.add('listening');
+                        activeLbl.textContent = 'LISTENING...';
+                        break;
+                    case VOICE_STATES.PROCESSING:
+                        activeBtn.classList.add('processing');
+                        activeBtn.disabled = true;
+                        activeLbl.textContent = 'PROCESSING...';
+                        break;
+                    case VOICE_STATES.ANSWERING:
+                        activeLbl.textContent = 'ANSWERING...';
+                        break;
+                    case VOICE_STATES.UNAVAILABLE:
+                        activeBtn.disabled = true;
+                        activeLbl.textContent = 'UNAVAILABLE';
+                        break;
+                    default:
+                        activeLbl.textContent = target === 'console' ? 'VOICE' : 'ASK ECO INTELLIGENCE';
+                }
+            }
+        }
+
+        function speakText(text) {
+            if (!window.speechSynthesis || !text) return;
+            window.speechSynthesis.cancel();
+            const utter = new SpeechSynthesisUtterance(text.substring(0, 500));
+            utter.rate = 0.95;
+            utter.onend = () => setVoiceState(VOICE_STATES.IDLE, voiceTarget);
+            window.speechSynthesis.speak(utter);
+        }
+
+        function initVoice(btnId, target) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+
+            if (!SpeechRecognition) {
+                setVoiceState(VOICE_STATES.UNAVAILABLE, target);
+                btn.title = 'Voice recognition not supported in this browser. Use Chrome or Edge.';
+                return;
+            }
+
+            btn.addEventListener('click', () => {
+                if (voiceRecognition) {
+                    voiceRecognition.stop();
+                    return;
+                }
+
+                voiceTarget = target;
+                voiceRecognition = new SpeechRecognition();
+                voiceRecognition.lang = 'en-US';
+                voiceRecognition.interimResults = true;
+                voiceRecognition.maxAlternatives = 1;
+
+                voiceRecognition.onstart = () => setVoiceState(VOICE_STATES.LISTENING, target);
+
+                voiceRecognition.onresult = (event) => {
+                    let transcript = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        transcript += event.results[i][0].transcript;
+                    }
+                    const transcriptEl = document.getElementById('voiceTranscript');
+                    if (transcriptEl) transcriptEl.textContent = `"${transcript}"`;
+
+                    if (event.results[event.results.length - 1].isFinal) {
+                        document.getElementById('aiAskInput').value = transcript;
+                        voiceRecognition = null;
+                        setVoiceState(VOICE_STATES.PROCESSING, target);
+                        sendAiAsk(transcript).then(() => {
+                            setVoiceState(VOICE_STATES.ANSWERING, target);
+                        });
+                    }
+                };
+
+                voiceRecognition.onerror = (event) => {
+                    voiceRecognition = null;
+                    setVoiceState(VOICE_STATES.IDLE, target);
+                    showToast(`Voice error: ${event.error}`, 'error');
+                };
+
+                voiceRecognition.onend = () => {
+                    if (voiceRecognition) { voiceRecognition = null; }
+                    if (document.getElementById('voiceStateLabel').textContent === VOICE_STATES.LISTENING) {
+                        setVoiceState(VOICE_STATES.IDLE, target);
+                    }
+                };
+
+                voiceRecognition.start();
+            });
+
+            // Keyboard accessibility: Enter/Space triggers voice
+            btn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
+            });
+        }
+
+        // Boot
+        checkAuth();
+        initGlobe();
+        updateDashboardData();
+        setInterval(updateDashboardData, 5000);
+        initVoice('voiceBtn', 'hero');
+        initVoice('voiceBtnConsole', 'console');
+
+    </script>
+</body>
+</html>

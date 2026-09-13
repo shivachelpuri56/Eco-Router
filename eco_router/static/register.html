@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register — Eco-Router</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #090a0f;
+            --surface: #12141c;
+            --primary: #1B4332;
+            --primary-hover: #2D6A4F;
+            --emerald: #00e080;
+            --text-main: #f0f0f0;
+            --text-muted: #8b92a5;
+            --border: #222635;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .left-pane {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            padding: 4rem;
+            background: linear-gradient(135deg, #090a0f 0%, #11151a 100%);
+            border-right: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        @media (min-width: 768px) {
+            .left-pane { display: flex; }
+        }
+
+        .brand-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .tagline {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            max-width: 400px;
+            line-height: 1.5;
+        }
+
+        .right-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .auth-card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background-color: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--emerald);
+            background-color: rgba(255,255,255,0.05);
+        }
+        
+        input:invalid:not(:placeholder-shown) {
+            border-color: #ff4a4a;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 0.875rem;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 1rem;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .auth-links {
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 0.875rem;
+        }
+
+        .auth-links a {
+            color: var(--emerald);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .auth-links a:hover {
+            text-decoration: underline;
+        }
+
+        .status-msg {
+            font-size: 0.875rem;
+            margin-top: 1rem;
+            text-align: center;
+            display: none;
+        }
+        .error { color: #ff4a4a; }
+        .success { color: var(--emerald); }
+
+        /* Subtle abstract network visual */
+        .network-bg {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            opacity: 0.15;
+            pointer-events: none;
+            background-image: 
+                radial-gradient(circle at 20% 30%, var(--emerald) 1px, transparent 1px),
+                radial-gradient(circle at 80% 40%, var(--emerald) 1px, transparent 1px),
+                radial-gradient(circle at 40% 80%, var(--emerald) 1px, transparent 1px),
+                radial-gradient(circle at 70% 90%, var(--emerald) 1px, transparent 1px);
+            background-size: 100% 100%;
+        }
+        
+        .network-line {
+            position: absolute;
+            border-top: 1px dashed var(--emerald);
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="left-pane">
+        <div class="network-bg">
+            <div class="network-line" style="top:30%; left:20%; width:60%; transform: rotate(10deg);"></div>
+            <div class="network-line" style="top:80%; left:40%; width:40%; transform: rotate(-20deg);"></div>
+        </div>
+        <div style="position:relative; z-index:1;">
+            <div class="brand-title">ECO-ROUTER</div>
+            <div class="tagline">Carbon-aware infrastructure for a cleaner digital world.</div>
+        </div>
+    </div>
+
+    <div class="right-pane">
+        <div class="auth-card">
+            <h2>Create Account</h2>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" required placeholder="Jane Doe">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" required autocomplete="email" placeholder="name@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required minlength="8" autocomplete="new-password" placeholder="••••••••">
+                </div>
+                <div class="form-group">
+                    <label for="confirm">Confirm Password</label>
+                    <input type="password" id="confirm" required minlength="8" autocomplete="new-password" placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn-primary" id="submitBtn">Create Account</button>
+                <div class="status-msg error" id="errorMsg"></div>
+                <div class="status-msg success" id="successMsg">Account created! Redirecting...</div>
+            </form>
+            
+            <div class="auth-links">
+                <span style="color:var(--text-muted);">Already have an account?</span>
+                <a href="/login">Sign in</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('registerForm');
+        const pass = document.getElementById('password');
+        const conf = document.getElementById('confirm');
+        const btn = document.getElementById('submitBtn');
+        const errorMsg = document.getElementById('errorMsg');
+        const successMsg = document.getElementById('successMsg');
+
+        // Basic client-side validation
+        function validate() {
+            if (conf.value && pass.value !== conf.value) {
+                conf.setCustomValidity("Passwords don't match");
+            } else {
+                conf.setCustomValidity("");
+            }
+        }
+        
+        pass.addEventListener('change', validate);
+        conf.addEventListener('keyup', validate);
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (pass.value !== conf.value) {
+                errorMsg.textContent = "Passwords do not match.";
+                errorMsg.style.display = 'block';
+                return;
+            }
+            
+            btn.textContent = 'Creating account...';
+            btn.disabled = true;
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'none';
+            
+            try {
+                const res = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('name').value,
+                        email: document.getElementById('email').value,
+                        password: pass.value
+                    })
+                });
+                
+                if (res.ok) {
+                    successMsg.style.display = 'block';
+                    setTimeout(() => { window.location.href = '/'; }, 1500);
+                } else {
+                    const data = await res.json();
+                    errorMsg.textContent = data.detail || 'Registration failed.';
+                    errorMsg.style.display = 'block';
+                    btn.textContent = 'Create Account';
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                errorMsg.textContent = 'Network error. Please try again.';
+                errorMsg.style.display = 'block';
+                btn.textContent = 'Create Account';
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
