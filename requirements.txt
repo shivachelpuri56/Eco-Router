@@ -1,0 +1,44 @@
+# ── Core ──────────────────────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+httpx>=0.27.0
+python-multipart>=0.0.9     # for form data forwarding
+
+# ── Async HTTP & Database ─────────────────────────────────────────────────────
+sqlalchemy[asyncio]>=2.0.0
+aiosqlite>=0.20.0
+
+# ── Configuration & Validation ────────────────────────────────────────────────
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+# ── Structured Logging ────────────────────────────────────────────────────────
+loguru>=0.7.0
+
+# ── Async Utilities ───────────────────────────────────────────────────────────
+anyio>=4.0.0
+
+# ── Optional: AI Insights (Eco Intelligence) ──────────────────────────────────
+# Only used when GEMINI_API_KEY is set in .env. App runs fully without it.
+google-genai>=1.0.0
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# ── Authentication ───────────────────────────────────────────────────────────
+passlib[bcrypt]>=1.7.4        # password hashing
+bcrypt<4.0.0                  # required to fix passlib bug
+python-jose[cryptography]>=3.3.0  # JWT tokens
+email-validator>=2.1.0        # EmailStr support for pydantic
+
+# ── Phase F: Prometheus Metrics ─────────────────────────────────────────────
+# Optional — app runs without it. If absent, /metrics returns a plain-text stub.
+prometheus-client>=0.20.0
+
+# ── Security Audit ────────────────────────────────────────────────────────────
+pip-audit>=2.7.0
+
+# -- Phase E: Database Migrations
+alembic>=1.13.0

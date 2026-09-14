@@ -1,0 +1,12 @@
+﻿global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'eco-router'
+    static_configs:
+      - targets: ['eco-router:8000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+    # Optional: Add bearer token auth if PROMETHEUS_AUTH_TOKEN is set
+    # bearer_token_file: /etc/prometheus/bearer_token

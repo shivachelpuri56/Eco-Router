@@ -1,0 +1,21 @@
+[project]
+name = "eco-router"
+version = "1.0.0"
+description = "Carbon-Aware Intelligent API Load Balancer — 1M1B AI for Sustainability"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+log_cli = true
+log_cli_level = "INFO"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pip-audit>=2.7.0",
+]

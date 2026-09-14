@@ -1,0 +1,117 @@
+﻿version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Eco-Router docker-compose
+#
+# Services:
+#   eco-router    FastAPI application (carbon-aware routing + AI + RAG)
+#   postgres      PostgreSQL 16 (Phase E — production database)
+#   prometheus    Prometheus (Phase F — metrics collection)
+#   grafana       Grafana (Phase G — dashboards)
+#
+# Quick start (development — SQLite, no auth required):
+#   docker compose up eco-router
+#
+# Full stack (production-style):
+#   cp .env.example .env        # fill in GEMINI_API_KEY etc
+#   docker compose up           # starts all services
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Eco-Router Application ──────────────────────────────────────────────────
+  eco-router:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - ":8000"
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL to use PostgreSQL when full stack is running
+      DATABASE_URL: 
+      HOST: 0.0.0.0
+      PORT: "8000"
+    volumes:
+      # Persist SQLite DB in development
+      - eco_router_data:/app/data
+      # Hot-reload knowledge base without restart
+      - ./knowledge:/app/knowledge:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - eco-net
+
+  # ── PostgreSQL (Phase E) ─────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: eco_router
+      POSTGRES_USER: eco_router
+      POSTGRES_PASSWORD: 
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eco_router -d eco_router"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - eco-net
+
+  # ── Prometheus (Phase F) ─────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    restart: unless-stopped
+    networks:
+      - eco-net
+
+  # ── Grafana (Phase G) ────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.2
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: 
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./deploy/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - eco-net
+
+volumes:
+  eco_router_data:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  eco-net:
+    driver: bridge
